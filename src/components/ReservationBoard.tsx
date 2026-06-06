@@ -8,6 +8,7 @@ import { Reservation } from '@/lib/types'
 interface Props {
   userId: string
   username: string
+  isAdmin?: boolean
 }
 
 interface ModalState {
@@ -16,9 +17,13 @@ interface ModalState {
   endSlot: number | null
 }
 
-export default function ReservationBoard({ userId, username }: Props) {
+interface ReservationWithUser extends Reservation {
+  reserverUsername?: string
+}
+
+export default function ReservationBoard({ userId, username, isAdmin = false }: Props) {
   const [activeDay, setActiveDay] = useState<DayOfWeek>('saturday')
-  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [reservations, setReservations] = useState<ReservationWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalState | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -32,13 +37,26 @@ export default function ReservationBoard({ userId, username }: Props) {
   const fetchReservations = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
-    const { data } = await supabase
+
+    const { data: resData } = await supabase
       .from('reservations')
       .select('*')
       .eq('date', currentDate)
-    setReservations(data || [])
+
+    if (isAdmin && resData && resData.length > 0) {
+      const userIds = [...new Set(resData.map(r => r.user_id))]
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds)
+      const profileMap = Object.fromEntries((profileData || []).map(p => [p.id, p.username]))
+      setReservations(resData.map(r => ({ ...r, reserverUsername: profileMap[r.user_id] || '-' })))
+    } else {
+      setReservations(resData || [])
+    }
+
     setLoading(false)
-  }, [currentDate])
+  }, [currentDate, isAdmin])
 
   useEffect(() => {
     fetchReservations()
@@ -46,10 +64,12 @@ export default function ReservationBoard({ userId, username }: Props) {
 
   const myReservation = reservations.find(r => r.user_id === userId)
 
+  function getReservationForCell(seat: number, slot: number): ReservationWithUser | undefined {
+    return reservations.find(r => r.seat_number === seat && r.start_slot <= slot && r.end_slot >= slot)
+  }
+
   function isSeatSlotReserved(seat: number, slot: number): boolean {
-    return reservations.some(
-      r => r.seat_number === seat && r.start_slot <= slot && r.end_slot >= slot
-    )
+    return !!getReservationForCell(seat, slot)
   }
 
   function isMyReservation(seat: number, slot: number): boolean {
@@ -64,7 +84,20 @@ export default function ReservationBoard({ userId, username }: Props) {
     return 'bg-green-100 hover:bg-green-200 text-green-800 cursor-pointer'
   }
 
+  function getCellLabel(seat: number, slot: number): string {
+    if (isMyReservation(seat, slot)) return '내것'
+    if (isSeatSlotReserved(seat, slot)) {
+      if (isAdmin) {
+        const r = getReservationForCell(seat, slot)
+        return r?.reserverUsername || '예약됨'
+      }
+      return '예약됨'
+    }
+    return ''
+  }
+
   function handleCellClick(seat: number, slot: number) {
+    if (isAdmin) return
     if (isSeatSlotReserved(seat, slot) && !isMyReservation(seat, slot)) return
     if (myReservation && !isMyReservation(seat, slot)) return
     setModal({ seat, startSlot: slot, endSlot: slot })
@@ -142,8 +175,8 @@ export default function ReservationBoard({ userId, username }: Props) {
         </button>
       </div>
 
-      {/* My Reservation Info */}
-      {myReservation && (
+      {/* My Reservation Info (students only) */}
+      {!isAdmin && myReservation && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-blue-800">내 예약</p>
@@ -169,9 +202,9 @@ export default function ReservationBoard({ userId, username }: Props) {
 
       {/* Legend */}
       <div className="flex gap-4 text-xs">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-200 inline-block"></span>예약 가능</span>
+        {!isAdmin && <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-200 inline-block"></span>예약 가능</span>}
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-400 inline-block"></span>예약됨</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block"></span>내 예약</span>
+        {!isAdmin && <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block"></span>내 예약</span>}
       </div>
 
       {/* Grid */}
@@ -198,10 +231,14 @@ export default function ReservationBoard({ userId, username }: Props) {
                     <td key={s.slot} className="p-1">
                       <button
                         onClick={() => handleCellClick(seat, s.slot)}
-                        disabled={isSeatSlotReserved(seat, s.slot) && !isMyReservation(seat, s.slot) || (!!myReservation && !isMyReservation(seat, s.slot))}
-                        className={`w-full h-8 rounded text-xs font-medium transition-colors ${getCellColor(seat, s.slot)} disabled:cursor-not-allowed`}
+                        disabled={
+                          isAdmin ||
+                          (isSeatSlotReserved(seat, s.slot) && !isMyReservation(seat, s.slot)) ||
+                          (!!myReservation && !isMyReservation(seat, s.slot))
+                        }
+                        className={`w-full h-8 rounded text-xs font-medium transition-colors ${getCellColor(seat, s.slot)} disabled:cursor-default`}
                       >
-                        {isMyReservation(seat, s.slot) ? '내것' : isSeatSlotReserved(seat, s.slot) ? '예약됨' : ''}
+                        {getCellLabel(seat, s.slot)}
                       </button>
                     </td>
                   ))}
@@ -212,8 +249,8 @@ export default function ReservationBoard({ userId, username }: Props) {
         </div>
       )}
 
-      {/* Modal */}
-      {modal && (
+      {/* Reservation Modal (students only) */}
+      {!isAdmin && modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
             <h3 className="text-lg font-bold text-gray-800 mb-4">{modal.seat}번 좌석 예약</h3>

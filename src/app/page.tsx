@@ -43,7 +43,7 @@ export default async function Home() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <ReservationBoard userId={user.id} username={username} />
+        <ReservationBoard userId={user.id} username={username} isAdmin={isAdmin} />
       </main>
     </div>
   )
