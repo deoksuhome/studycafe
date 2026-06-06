@@ -9,9 +9,17 @@ interface Props {
   profiles: Profile[]
 }
 
+const ANIMAL_IDS = [
+  'bear', 'wolf', 'fox', 'deer', 'lion', 'tiger', 'eagle', 'hawk', 'crow', 'dove',
+  'frog', 'toad', 'duck', 'swan', 'mole', 'otter', 'seal', 'whale', 'shark', 'crab',
+  'snail', 'slug', 'moth', 'wasp', 'bee', 'ant', 'fly', 'worm', 'bat', 'owl',
+  'pony', 'mare', 'bull', 'boar', 'goat', 'lamb', 'hen', 'rooster', 'turkey', 'quail',
+  'robin', 'finch', 'wren', 'swift', 'crane', 'heron', 'ibis', 'stork', 'newt', 'vole',
+]
+
 function generatePassword(): string {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
 export default function AdminDashboard({ reservations: initialReservations, profiles }: Props) {
@@ -77,8 +85,8 @@ export default function AdminDashboard({ reservations: initialReservations, prof
     setBatchProgress(0)
     const batchUsers: { username: string; password: string }[] = []
 
-    for (let i = 1; i <= 50; i++) {
-      const u = `st${String(i).padStart(2, '0')}`
+    for (let i = 0; i < 50; i++) {
+      const u = ANIMAL_IDS[i]
       const p = generatePassword()
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
@@ -187,7 +195,7 @@ export default function AdminDashboard({ reservations: initialReservations, prof
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-gray-800">이번 세션 생성된 계정</h2>
               <button
-                onClick={downloadCSV}
+                onClick={() => downloadCSV()}
                 className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium"
               >
                 CSV 다운로드
