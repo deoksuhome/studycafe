@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ReservationBoard from '@/components/ReservationBoard'
+import LogoutButton from '@/components/LogoutButton'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -19,13 +20,6 @@ export default async function Home() {
   const username = profile?.username || user.email?.split('@')[0] || '사용자'
   const isAdmin = profile?.role === 'admin'
 
-  async function handleLogout() {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -43,14 +37,7 @@ export default async function Home() {
                 관리자
               </a>
             )}
-            <form action={handleLogout}>
-              <button
-                type="submit"
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                로그아웃
-              </button>
-            </form>
+            <LogoutButton />
           </div>
         </div>
       </header>
