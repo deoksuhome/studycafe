@@ -22,6 +22,8 @@ export default function AdminDashboard({ reservations: initialReservations, prof
   const [createError, setCreateError] = useState('')
   const [createdUsers, setCreatedUsers] = useState<{ username: string; password: string }[]>([])
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [batchCreating, setBatchCreating] = useState(false)
+  const [batchProgress, setBatchProgress] = useState(0)
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault()
@@ -54,10 +56,11 @@ export default function AdminDashboard({ reservations: initialReservations, prof
     setDeleting(null)
   }
 
-  function downloadCSV() {
-    if (createdUsers.length === 0) return
+  function downloadCSV(users?: { username: string; password: string }[]) {
+    const target = users || createdUsers
+    if (target.length === 0) return
     const header = '아이디,비밀번호'
-    const rows = createdUsers.map(u => `${u.username},${u.password}`)
+    const rows = target.map(u => `${u.username},${u.password}`)
     const csv = [header, ...rows].join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -66,6 +69,30 @@ export default function AdminDashboard({ reservations: initialReservations, prof
     a.download = 'student_accounts.csv'
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function handleBatchCreate() {
+    if (!confirm('학생 50명 계정을 자동 생성합니다. 계속하시겠습니까?')) return
+    setBatchCreating(true)
+    setBatchProgress(0)
+    const batchUsers: { username: string; password: string }[] = []
+
+    for (let i = 1; i <= 50; i++) {
+      const u = `st${String(i).padStart(2, '0')}`
+      const p = generatePassword()
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }),
+      })
+      if (res.ok) batchUsers.push({ username: u, password: p })
+      setBatchProgress(i)
+    }
+
+    setBatchCreating(false)
+    setCreatedUsers(prev => [...prev, ...batchUsers])
+    downloadCSV(batchUsers)
+    alert(`${batchUsers.length}명 생성 완료! CSV 파일이 다운로드됩니다.`)
   }
 
   function getTimeLabel(r: Reservation) {
@@ -88,9 +115,28 @@ export default function AdminDashboard({ reservations: initialReservations, prof
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+        {/* Batch Create 50 Students */}
+        <section className="bg-white rounded-xl shadow-sm p-6 border-2 border-blue-100">
+          <h2 className="text-base font-bold text-gray-800 mb-2">학생 50명 일괄 생성</h2>
+          <p className="text-sm text-gray-500 mb-4">st01~st50 아이디로 50개 계정을 자동 생성하고 CSV 파일로 다운로드합니다.</p>
+          {batchCreating ? (
+            <div>
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                <div className="bg-blue-600 h-3 rounded-full transition-all" style={{ width: `${(batchProgress / 50) * 100}%` }}></div>
+              </div>
+              <p className="text-sm text-gray-600">{batchProgress} / 50 생성 중...</p>
+            </div>
+          ) : (
+            <button onClick={handleBatchCreate}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg text-sm">
+              50명 자동 생성 + CSV 다운로드
+            </button>
+          )}
+        </section>
+
         {/* Create Student Account */}
         <section className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-800 mb-4">학생 계정 생성</h2>
+          <h2 className="text-base font-bold text-gray-800 mb-4">학생 계정 개별 생성</h2>
           <form onSubmit={handleCreateUser} className="flex gap-3 items-end flex-wrap">
             <div>
               <label className="text-sm text-gray-600 block mb-1">아이디</label>
