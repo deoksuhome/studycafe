@@ -16,17 +16,17 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'admin') redirect('/')
 
-  // Fetch all reservations with profile info
-  const { data: reservations } = await supabase
-    .from('reservations')
-    .select('*, profiles(username)')
-    .order('date', { ascending: true })
-    .order('start_slot', { ascending: true })
+  const [{ data: reservations }, { data: profiles }] = await Promise.all([
+    supabase.from('reservations').select('*').order('date', { ascending: true }).order('start_slot', { ascending: true }),
+    supabase.from('profiles').select('*').order('username'),
+  ])
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('username')
+  // attach username to each reservation
+  const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+  const reservationsWithProfile = (reservations || []).map(r => ({
+    ...r,
+    profiles: profileMap[r.user_id] || null,
+  }))
 
-  return <AdminDashboard reservations={reservations || []} profiles={profiles || []} />
+  return <AdminDashboard reservations={reservationsWithProfile} profiles={profiles || []} />
 }
