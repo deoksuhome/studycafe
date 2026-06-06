@@ -187,7 +187,7 @@ export default function AdminDashboard({ reservations: initialReservations, prof
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-gray-800">이번 세션 생성된 계정</h2>
               <button
-                onClick={downloadCSV}
+                onClick={() => downloadCSV()}
                 className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium"
               >
                 CSV 다운로드
